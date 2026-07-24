@@ -342,3 +342,59 @@ number: the whole response of delay/switches/energy to the threshold knob.
 
 ### Status: Bricks 1–5 DONE. The simulation is complete and produces the result.
 Next: bigger sweeps, the telemetry-delay figure, then the paper and the demo.
+
+---
+
+## CORRECTION (important — supersedes earlier text)
+
+**An earlier version of this code wrongly disabled 22 inter-plane links,
+claiming Walker Delta constellations have a "seam." That was false.**
+
+**Seams are a Walker STAR feature, not Walker Delta.** The two families
+differ in how they spread their orbital planes:
+
+- **Walker STAR** spreads ascending nodes over **180°**. Wrapping around that
+  half-circle puts you next to planes travelling the *opposite* direction
+  (ascending vs descending). Relative velocity ~2× orbital speed — far too
+  fast for a laser to track. That counter-rotating boundary *is* the seam.
+  **Iridium and OneWeb are Walker Star — they have seams.**
+- **Walker DELTA** spreads ascending nodes over the full **360°**. Every plane
+  runs the *same* direction. No counter-rotation, no seam.
+
+**Ours is Walker Delta**, so `ISL_DISABLE_SEAM = False` and all 264 satellites
+have their full 4 ISLs (2 intra-plane + 2 inter-plane = 528 links total).
+Previously 44 satellites were artificially limited to 3 links.
+
+**Sources:**
+- IETF `draft-piraux-space-constellation-code-00`: for Walker Delta, "there is
+  no seam effect as in the Walker Star pattern. Instead, each orbit progresses
+  in the same direction and crosses paths twice with every other orbit."
+- MATLAB `walkerDelta` documentation: Delta distributes ascending nodes across
+  360°; Star distributes across 180°.
+- arXiv:2209.05984: describes seams as arising from "adjacent counterrotating
+  planes" in Walker *Star* polar constellations.
+
+The flag is kept (not deleted) so a Walker Star variant can be simulated later.
+
+### Did the fix change the result? No.
+
+| threshold | switch cut | energy cut | delay cost |
+|---|---|---|---|
+| 0.90 | 46.3% | 39.2% | 0.3% |
+| **0.80** | **61.1%** | **58.0%** | **2.1%** |
+| 0.70 | 72.2% | 70.1% | 3.4% |
+
+Before the fix, threshold 0.80 gave 65.4% / 58.3% / 2.2%. **Essentially
+unchanged.** The result comes from the gate logic, not from a topology
+artifact — which is exactly what you want to see when you fix a bug.
+
+### Also fixed: the autocorrelation measurement
+
+The Brick 2 autocorrelation test was measured over only 600 samples from one
+link, producing non-monotonic nonsense (0.07 at 30s bouncing back to 0.15 at
+60s). Now averaged over 40 links × 4000 samples, it decays cleanly as an
+Ornstein-Uhlenbeck process should:
+
+`0.966 (1s) → 0.843 (5s) → 0.599 (15s) → 0.359 (30s) → 0.124 (60s) → 0.016 (120s)`
+
+The physics was always right; the measurement was too noisy. Now closed.

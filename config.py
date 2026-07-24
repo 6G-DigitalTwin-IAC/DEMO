@@ -143,14 +143,40 @@ ISL_POLAR_CUTOFF_DEG = 70.0
 # DO NOT lower it to make links break -- that would be fabricating a
 # physical effect that does not exist at this inclination.
 
-ISL_DISABLE_SEAM = True
-# [SOURCED-ish] The "seam" is the boundary between the last plane and
-# the first. There, neighbouring satellites travel in OPPOSITE
-# directions (one side ascending, the other descending). Relative
-# velocity ~15 km/s -- twice orbital speed. No laser tracks that.
-# Real Walker Delta constellations leave the seam unlinked. It is a
-# well-documented routing headache.
-# CONSEQUENCE: 44 satellites (2 planes x 22) have 3 links, not 4.
+ISL_DISABLE_SEAM = False
+# [SOURCED] CORRECTED. A Walker DELTA constellation has NO SEAM.
+#
+# WHAT WE GOT WRONG BEFORE: an earlier version set this True and claimed
+# "Walker Delta constellations leave the seam unlinked." That is FALSE.
+# The seam is a Walker STAR feature, not a Walker Delta one.
+#
+# WHY: the two families differ in how they spread their orbital planes.
+#   Walker STAR  spreads ascending nodes over 180 deg. Wrapping around
+#                that half-circle puts you next to planes travelling the
+#                OPPOSITE way (ascending vs descending). Relative speed
+#                ~2x orbital velocity, far too fast for a laser to track.
+#                That counter-rotating boundary IS the seam. Iridium and
+#                OneWeb are Walker Star -- they have seams.
+#   Walker DELTA spreads ascending nodes over the full 360 deg. Every
+#                plane runs the SAME direction. Adjacent planes never
+#                counter-rotate. There is no seam to disable.
+#
+# SOURCES:
+#   - IETF draft-piraux-space-constellation-code-00: for Walker Delta,
+#     "there is no seam effect as in the Walker Star pattern. Instead,
+#     each orbit progresses in the same direction and crosses paths
+#     twice with every other orbit."
+#   - MATLAB walkerDelta docs: Delta distributes ascending nodes across
+#     360 deg; Star distributes across 180 deg.
+#   - arXiv:2209.05984 (SDN routing for LEO): describes seams as a
+#     Walker STAR property arising from "adjacent counterrotating
+#     planes" in polar constellations.
+#
+# CONSEQUENCE OF THE FIX: all 264 satellites now have 4 ISLs (2 intra,
+# 2 inter). Previously 44 satellites were artificially limited to 3.
+# The flag is kept (not deleted) so a Walker Star variant can be
+# simulated later by setting it True -- but for OUR constellation it
+# must be False.
 
 
 # ===========================================================================

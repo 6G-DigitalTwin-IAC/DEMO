@@ -53,11 +53,11 @@ THE TWO KINDS BEHAVE COMPLETELY DIFFERENTLY:
       over a full orbit. Like two horses on a carousel.
 
   INTER-PLANE: VARIES.
-      Neighbouring rings are tilted relative to each other, so they
-      cross near the poles and spread apart near the equator. The two
-      satellites converge and diverge every orbit (2315-3680 km here).
-      Can break via the polar cutoff or the range limit -- though at
-      53 deg inclination, neither ever fires. See config.py.
+      Neighbouring rings are tilted relative to each other, so the two
+      satellites converge and diverge every orbit. Measured here:
+      closest ~2316 km at 53 deg latitude, farthest ~3680 km at the
+      equator. Can break via the polar cutoff or the range limit --
+      though at 53 deg inclination, neither ever fires. See config.py.
 """
 
 import numpy as np
@@ -83,17 +83,31 @@ def build_isl_plan():
     Returns: list of (sat_a, sat_b, kind), kind in {"intra", "inter"}.
              Each undirected link appears once, with a < b.
 
-    THE SEAM:
-      Planes sit at RAAN 0, 30, 60, ... 330 deg. Walking 0 -> 1 -> 2 ...
-      each ring is 30 deg further round. But wrapping 11 -> 0, you meet
-      satellites travelling the OPPOSITE way -- one side ascending
-      (heading north), the other descending. Relative speed ~15 km/s,
-      twice orbital velocity. No laser tracks that.
+    THE SEAM -- AND WHY OUR CONSTELLATION DOESN'T HAVE ONE:
 
-      So real Walker Delta constellations leave the seam unlinked.
-      CONSEQUENCE: 44 satellites (planes 0 and 11) have 3 links, not 4.
-      That's a wall traffic must route around -- a real routing headache
-      and part of why IST-NYC delay swings so much.
+      A "seam" is a boundary where two neighbouring orbital planes run
+      in OPPOSITE directions (one ascending, one descending). Relative
+      velocity there is about twice orbital speed, far too fast for a
+      laser terminal to track, so no ISL can be maintained across it.
+
+      CRITICAL: seams are a Walker STAR feature, NOT Walker Delta.
+        Walker STAR  spreads ascending nodes over 180 deg, so wrapping
+                     around puts you beside counter-rotating planes.
+                     Iridium and OneWeb are Star -- they have seams.
+        Walker DELTA spreads ascending nodes over the full 360 deg, so
+                     every plane runs the SAME direction. No counter-
+                     rotation anywhere. No seam.
+
+      OURS IS WALKER DELTA, so ISL_DISABLE_SEAM is False and all 264
+      satellites get their full 4 links.
+
+      (An earlier version of this file wrongly claimed Walker Delta
+      constellations leave a seam unlinked, and artificially cut 22
+      links. That was incorrect and has been fixed. The flag remains so
+      a Walker Star variant can be simulated later.)
+
+      Sources: IETF draft-piraux-space-constellation-code-00;
+      MATLAB walkerDelta documentation; arXiv:2209.05984.
     """
     links = []
     seen = set()

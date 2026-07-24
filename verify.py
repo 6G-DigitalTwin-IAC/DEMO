@@ -153,12 +153,24 @@ def test_isl_topology():
                f"distribution = {dict(Counter(deg.values()))}")
     print("          (a laser terminal is a physical telescope. You get 4.)")
 
-    n_seam = 2 * config.SATS_PER_PLANE
-    n_three = sum(1 for v in deg.values() if v == 3)
-    check_true("seam satellites have 3 links, others 4",
-               n_three == n_seam,
-               f"{n_three} sats with 3 links; expected {n_seam} "
-               f"(planes 0 and {config.NUM_PLANES-1})")
+    # Walker DELTA has NO seam: planes spread over the full 360 deg, so
+    # every plane runs the same direction and every satellite gets all 4
+    # links. (Walker STAR spreads over 180 deg and DOES have a seam --
+    # that's Iridium/OneWeb, not us.) An earlier version wrongly cut 22
+    # links here; this test now guards against that regression.
+    n_four = sum(1 for v in deg.values() if v == 4)
+    if config.ISL_DISABLE_SEAM:
+        n_seam = 2 * config.SATS_PER_PLANE
+        n_three = sum(1 for v in deg.values() if v == 3)
+        check_true("Walker STAR mode: seam satellites have 3 links",
+                   n_three == n_seam,
+                   f"{n_three} sats with 3 links (seam disabled)")
+    else:
+        check_true("Walker DELTA: every satellite has all 4 ISLs (no seam)",
+                   n_four == config.N_SATS,
+                   f"{n_four}/{config.N_SATS} satellites have 4 links. "
+                   f"Walker Delta spreads planes over 360 deg, so no "
+                   f"counter-rotating boundary exists.")
 
     check_true("intra-plane link count",
                summary["intra_plane_links"] == config.N_SATS,
@@ -394,18 +406,29 @@ def test_background_traffic():
     print("  and our paper's question would be rigged. Real load is")
     print("  autocorrelated. Let's prove ours is too.\n")
 
-    key = list(bg.load.keys())[0]
-    series = []
-    for _ in range(600):
-        series.append(bg.load[key])
+    # Measure over MANY links and a long series. A 600-sample estimate
+    # from one link is far too noisy -- it was giving non-monotonic
+    # nonsense (0.07 at 30s bouncing back to 0.15 at 60s). Averaging the
+    # autocorrelation across links gives a stable estimate.
+    keys = list(bg.load.keys())[:40]
+    series_multi = {k: [] for k in keys}
+    for _ in range(4000):
+        for k in keys:
+            series_multi[k].append(bg.load[k])
         bg.step(1.0)
-    series = np.array(series)
+    series = np.array(series_multi[keys[0]])
 
-    def autocorr(x, lag):
+    def autocorr_one(x, lag):
+        x = np.asarray(x, dtype=float)
         x = x - x.mean()
         if x.std() < 1e-12:
             return 0.0
         return float(np.corrcoef(x[:-lag], x[lag:])[0, 1])
+
+    def autocorr(_unused, lag):
+        """Average autocorrelation across many links -- stable estimate."""
+        vals = [autocorr_one(series_multi[k], lag) for k in keys]
+        return float(np.mean(vals))
 
     print(f"  {'lag':>8} {'autocorrelation':>18}")
     for lag in [1, 5, 15, 30, 60, 120]:
@@ -426,11 +449,7 @@ def test_background_traffic():
     print("  MEANINGFUL BUT IMPERFECT -- exactly what we want to study.")
 
     # long-run statistics should match config
-    long_series = []
-    for _ in range(5000):
-        bg.step(1.0)
-        long_series.append(bg.load[key])
-    ls = np.array(long_series)
+    ls = np.array([v for k in keys for v in series_multi[k]])
     check("long-run mean matches config",
           float(ls.mean()), config.BACKGROUND_LOAD_MEAN, 0.08, "")
     print("          (the OU process pulls back to the configured mean)")
