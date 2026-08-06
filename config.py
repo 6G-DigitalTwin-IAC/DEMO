@@ -196,7 +196,7 @@ GSL_MAX_LINKS = 2
 
 GROUND_STATIONS = {
     "IST": (41.0082, 28.9784),    # Istanbul, Turkiye
-    "NYC": (40.7128, -74.0060),   # New York, USA
+    "NYC": (35.6762, 139.6503),   # New York, USA
 }
 # (lat_deg, lon_deg) on the ROTATING Earth.
 # ~7500 km apart, both near 41 deg N -- inside the 53 deg coverage band,
