@@ -102,6 +102,54 @@ def summarize(ref, results):
               f"{(1-e/nogate_e)*100:>10.1f}% {(d/nogate_d-1)*100:>10.1f}%")
 
 
+def snapshot_config():
+    """
+    Grab every value defined in config.py, automatically.
+
+    Returns a plain dict {parameter_name: value} of every UPPER_CASE
+    setting in config -- constants, sourced values, swept values, all of
+    them. We don't hand-pick: we take everything, so the record is
+    complete and stays correct even when new parameters are added later.
+
+    Only plain numbers, strings, and simple containers are kept (so the
+    result is safe to write to JSON). Things like numpy arrays or the
+    ground-station dict are converted to a JSON-friendly form.
+    """
+    import config as _cfg
+
+    def jsonable(v):
+        # numbers and strings pass straight through
+        if isinstance(v, (int, float, str, bool)) or v is None:
+            return v
+        # numpy scalars -> python numbers
+        try:
+            import numpy as _np
+            if isinstance(v, _np.floating):
+                return float(v)
+            if isinstance(v, _np.integer):
+                return int(v)
+            if isinstance(v, _np.ndarray):
+                return v.tolist()
+        except Exception:
+            pass
+        # dicts / lists / tuples -> recurse
+        if isinstance(v, dict):
+            return {str(k): jsonable(val) for k, val in v.items()}
+        if isinstance(v, (list, tuple)):
+            return [jsonable(x) for x in v]
+        # anything else -> its text form, so we still record SOMETHING
+        return str(v)
+
+    snap = {}
+    for name in dir(_cfg):
+        if name.startswith("_"):
+            continue                      # skip private / dunder names
+        if not name.isupper():
+            continue                      # config settings are UPPER_CASE
+        snap[name] = jsonable(getattr(_cfg, name))
+    return snap
+
+
 if __name__ == "__main__":
     seeds = int(sys.argv[1]) if len(sys.argv) > 1 else 5
     duration = int(sys.argv[2]) if len(sys.argv) > 2 else 900
@@ -109,9 +157,16 @@ if __name__ == "__main__":
     ref, results = sweep(seeds, duration)
     summarize(ref, results)
 
-    # save raw for later plotting
-    out = {"ref": ref, "results": {str(k): v for k, v in results.items()},
-           "seeds": seeds, "duration_s": duration}
+    # save raw for later plotting AND the full config that produced it,
+    # so every result file is self-documenting. This is what lets the
+    # adaptive-threshold work later match "conditions -> best threshold".
+    out = {
+        "config": snapshot_config(),          # <-- every parameter + value
+        "ref": ref,
+        "results": {str(k): v for k, v in results.items()},
+        "seeds": seeds,
+        "duration_s": duration,
+    }
     with open("sweep_results.json", "w") as f:
         json.dump(out, f, indent=2)
-    print("\nsaved sweep_results.json")
+    print("\nsaved sweep_results.json  (now includes full config snapshot)")
