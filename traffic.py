@@ -51,6 +51,8 @@ from config import (
     BUFFER_DELAY_MS, BUFFER_EXPONENT, MAX_UTILISATION,
     BACKGROUND_LOAD_MEAN, BACKGROUND_LOAD_SIGMA,
     BACKGROUND_CORRELATION_TIME_S, TICK_S,
+    TRAFFIC_MODEL, BURST_PROB_PER_LINK_PER_S,
+    BURST_SIZE_MEAN, BURST_DECAY_TIME_S,
 )
 
 
@@ -240,14 +242,23 @@ class BackgroundTraffic:
         self.theta = 1.0 / BACKGROUND_CORRELATION_TIME_S
         self.load = {}
 
+        # In bursty mode, each link also carries a "burst" amount on TOP
+        # of its smooth drift. This starts at zero, jumps up when a burst
+        # fires, and decays away. In smooth mode it stays zero forever, so
+        # the model is IDENTICAL to the original.
+        self.burst = {}
+
         for (a, b, kind) in isl_plan:
-            self.load[(min(a, b), max(a, b))] = self._sample_initial()
+            key = (min(a, b), max(a, b))
+            self.load[key] = self._sample_initial()
+            self.burst[key] = 0.0
 
         # Ground links keyed by STATION, not satellite: the station's
         # users don't disappear when it hands over from one satellite to
         # the next. Load follows the station.
         for name in gs_names:
             self.load[("GS", name)] = self._sample_initial()
+            self.burst[("GS", name)] = 0.0
 
     def _sample_initial(self):
         x = self.rng.normal(BACKGROUND_LOAD_MEAN, BACKGROUND_LOAD_SIGMA)
@@ -266,25 +277,62 @@ class BackgroundTraffic:
         mu = BACKGROUND_LOAD_MEAN
         kick = BACKGROUND_LOAD_SIGMA * np.sqrt(2.0 * theta * dt_s)
 
+        # 1. SMOOTH DRIFT -- unchanged from the original model. This is
+        #    the base load, and in "smooth" mode it's the whole story.
         for k in self.load:
             x = self.load[k]
             dx = theta * (mu - x) * dt_s + kick * self.rng.normal()
             self.load[k] = float(np.clip(x + dx, 0.0, MAX_UTILISATION))
 
+        # 2. BURST LAYER -- only in bursty mode. Each link may suddenly
+        #    spike, then its spike decays away over BURST_DECAY_TIME_S.
+        #    In smooth mode this whole block is skipped and burst stays 0.
+        if TRAFFIC_MODEL == "bursty":
+            decay = np.exp(-dt_s / BURST_DECAY_TIME_S)   # fraction kept per tick
+            p_fire = BURST_PROB_PER_LINK_PER_S * dt_s
+            for k in self.burst:
+                # existing burst fades toward zero
+                self.burst[k] *= decay
+                # a new burst may fire on this link
+                if self.rng.random() < p_fire:
+                    # burst size is random but centred on BURST_SIZE_MEAN
+                    size = abs(self.rng.normal(BURST_SIZE_MEAN,
+                                               BURST_SIZE_MEAN * 0.4))
+                    self.burst[k] += size
+
     def utilisation(self, u, v, kind):
-        """Background utilisation on the link between nodes u and v."""
+        """
+        Background utilisation on the link between nodes u and v.
+
+        This is smooth drift PLUS any active burst, clipped to the valid
+        range. In smooth mode the burst term is always zero, so this is
+        exactly the original value.
+        """
         if kind == "gsl":
             name = u if isinstance(u, str) else v
-            return self.load.get(("GS", name), BACKGROUND_LOAD_MEAN)
-        return self.load.get((min(u, v), max(u, v)), BACKGROUND_LOAD_MEAN)
+            key = ("GS", name)
+        else:
+            key = (min(u, v), max(u, v))
+        base = self.load.get(key, BACKGROUND_LOAD_MEAN)
+        extra = self.burst.get(key, 0.0)
+        return float(min(base + extra, MAX_UTILISATION))
 
     def snapshot(self):
         """
-        Full copy of current load.
-        Brick 3 will use this as the telemetry report the twin
-        receives -- late.
+        Full copy of current load, INCLUDING active bursts -- because a
+        burst is part of the true state the telemetry would report.
+
+        Brick 3 uses this as the telemetry report the twin receives, late.
+        That lateness is exactly why bursts matter: by the time the twin's
+        report arrives, a burst may have grown or faded, so the twin's
+        view of it is wrong. In smooth mode bursts are always zero, so
+        this is identical to the original snapshot.
         """
-        return dict(self.load)
+        snap = {}
+        for k, base in self.load.items():
+            extra = self.burst.get(k, 0.0)
+            snap[k] = float(min(base + extra, MAX_UTILISATION))
+        return snap
 
 
 # =====================================================================

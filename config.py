@@ -320,6 +320,51 @@ BACKGROUND_CORRELATION_TIME_S = 30.0
 
 
 # ===========================================================================
+# TRAFFIC MODEL -- smooth vs bursty
+# ===========================================================================
+# Two ways the background load can behave over time. Same delay physics,
+# same everything else -- only HOW the load evolves changes.
+#
+#   "smooth" -- the original model. Load drifts gently (Ornstein-
+#               Uhlenbeck). A link busy now is probably still busy in a
+#               few seconds. The twin's stale view is usually close.
+#               This is the DEFAULT so all existing results reproduce.
+#
+#   "bursty" -- smooth drift MOST of the time, plus occasional sudden
+#               jolts on individual links. Grounded in the finding that
+#               real satellite traffic "exhibits significant bursts and
+#               high-frequency fluctuations" (LEOSTP, arXiv:2606.29856,
+#               via the team literature review). This makes the twin's
+#               stale view occasionally, genuinely wrong -- a harder and
+#               more realistic test of the gate.
+#
+# IMPORTANT -- this is NOT the old "teleport" model. In the broken early
+# code, load jumped to a fresh random value EVERY tick, making it
+# unpredictable in principle and the twin hopeless by construction.
+# Here, bursts are OCCASIONAL and sit on top of a still-predictable
+# drift, so the twin is usually right and sometimes caught out. That's
+# the honest regime.
+
+TRAFFIC_MODEL = "smooth"
+# [ASSUMED] "smooth" or "bursty". Default smooth. Switch to compare.
+
+BURST_PROB_PER_LINK_PER_S = 0.01
+# [SWEPT] In bursty mode, the chance PER LINK PER SECOND that a sudden
+# burst begins on that link. 0.01 = on average one burst per link every
+# 100 s. Small on purpose: bursts are events, not the norm.
+
+BURST_SIZE_MEAN = 0.35
+# [SWEPT] How big a burst is, in utilisation points added when it hits.
+# 0.35 means a link at 0.4 can jump toward ~0.75 -- a real, twin-
+# surprising jump, but bounded (still clipped at MAX_UTILISATION).
+
+BURST_DECAY_TIME_S = 8.0
+# [SWEPT] How fast a burst fades back toward normal, in seconds. A burst
+# is not permanent -- it spikes then decays. 8 s is short enough that
+# the twin (updating on a similar scale) genuinely lags it.
+
+
+# ===========================================================================
 # SIMULATION TIMING
 # ===========================================================================
 
