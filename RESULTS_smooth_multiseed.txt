@@ -1,0 +1,37 @@
+Adaptive gate end-to-end test  (traffic=smooth)
+5 seeds x 1500 ticks per scenario, averaged (mean +/- std across seeds)
+
+=== scenario: telemetry_delay=2.0s, load_sigma=0.1 ===
+  policy                      delay ms        switches        energy J
+  no-gate                  294±7          159±13        6.61±0.38  
+  fixed gate (0.80)        306±8           50±8         2.39±0.48  
+  ADAPTIVE (kNN)           298±7           84±8         3.79±0.44  
+  (adaptive gate chose avg threshold 0.90)
+
+=== scenario: telemetry_delay=5.0s, load_sigma=0.3 ===
+  policy                      delay ms        switches        energy J
+  no-gate                  301±7          157±12        6.46±0.31  
+  fixed gate (0.80)        311±9           49±7         2.41±0.46  
+  ADAPTIVE (kNN)           306±8           66±7         3.02±0.43  
+  (adaptive gate chose avg threshold 0.86)
+
+=== scenario: telemetry_delay=10.0s, load_sigma=0.5 ===
+  policy                      delay ms        switches        energy J
+  no-gate                  312±8          156±13        6.42±0.46  
+  fixed gate (0.80)        319±11          50±7         2.45±0.37  
+  ADAPTIVE (kNN)           316±9           63±7         2.86±0.36  
+  (adaptive gate chose avg threshold 0.85)
+
+=== scenario: telemetry_delay=20.0s, load_sigma=0.65 ===
+  policy                      delay ms        switches        energy J
+  no-gate                  330±10         154±10        6.25±0.35  
+  fixed gate (0.80)        331±15          48±8         2.32±0.44  
+  ADAPTIVE (kNN)           332±14          47±7         2.27±0.41  
+  (adaptive gate chose avg threshold 0.79)
+
+=== scenario: telemetry_delay=30.0s, load_sigma=0.7 ===
+  policy                      delay ms        switches        energy J
+  no-gate                  343±12         152±10        6.27±0.34  
+  fixed gate (0.80)        340±12          50±6         2.51±0.34  
+  ADAPTIVE (kNN)           355±13          28±3         1.40±0.19  
+  (adaptive gate chose avg threshold 0.59)

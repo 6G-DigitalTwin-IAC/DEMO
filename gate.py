@@ -161,3 +161,69 @@ class TwinGatePolicy(Policy):
             self.prev_path = self.current_path
 
         return self.current_path
+
+
+class TwinGateAdaptivePolicy(Policy):
+    """
+    THE ADAPTIVE METHOD -- our contribution's autonomous form.
+
+    Same gate rule as TwinGatePolicy, but the threshold is NOT fixed. On
+    every decision it:
+      1. reads the conditions it can see from the TWIN (telemetry delay is
+         known; sigma is measured from the twin's stale belief),
+      2. asks the kNN what threshold suits those conditions,
+      3. applies that threshold to the switch decision.
+
+    Crucially, the conditions come only from the twin's view -- the
+    adaptive gate is as blind as the twin. It never reads reality.
+    """
+    def __init__(self, knn, telemetry_delay_s, twin, recompute_every=10):
+        super().__init__("twin_gate_adaptive")
+        self.knn = knn
+        self.delay = telemetry_delay_s      # known system setting
+        self.twin = twin                    # to measure sigma from its belief
+        self.recompute_every = recompute_every  # don't re-query every tick
+        self._ticks = 0
+        self.threshold = 0.85               # sensible start until first query
+        self.threshold_history = []
+
+    def _refresh_threshold(self):
+        from adaptive import measure_sigma_from_twin
+        sigma_now = measure_sigma_from_twin(self.twin)
+        self.threshold = self.knn.predict(self.delay, sigma_now)
+        self.threshold_history.append(self.threshold)
+
+    def decide(self, G_real, G_twin, src, dst):
+        # periodically re-ask the kNN for the right threshold
+        if self._ticks % self.recompute_every == 0:
+            self._refresh_threshold()
+        self._ticks += 1
+
+        proposal = network.shortest_path(G_twin, src, dst, "delay_s")
+
+        if self.current_path is None:
+            if proposal is not None:
+                self._adopt(proposal)
+            else:
+                self.switched_this_tick = False
+            return self.current_path
+
+        if proposal is None:
+            self.switched_this_tick = False
+            return self.current_path
+
+        if proposal == self.current_path:
+            self.switched_this_tick = False
+            self.prev_path = self.current_path
+            return self.current_path
+
+        current_pred = network.path_delay_s(G_twin, self.current_path)
+        proposal_pred = network.path_delay_s(G_twin, proposal)
+
+        if proposal_pred < self.threshold * current_pred:
+            self._adopt(proposal)
+        else:
+            self.switched_this_tick = False
+            self.prev_path = self.current_path
+
+        return self.current_path

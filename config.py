@@ -345,7 +345,7 @@ BACKGROUND_CORRELATION_TIME_S = 30.0
 # drift, so the twin is usually right and sometimes caught out. That's
 # the honest regime.
 
-TRAFFIC_MODEL = "bursty"
+TRAFFIC_MODEL = "smooth"
 # [ASSUMED] "smooth" or "bursty". Default smooth. Switch to compare.
 
 BURST_PROB_PER_LINK_PER_S = 0.01
