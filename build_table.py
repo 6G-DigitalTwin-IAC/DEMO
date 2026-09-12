@@ -37,8 +37,13 @@ import config
 
 
 # ---- the grid: the two parameters that matter, at sensible steps ----
-TELEMETRY_DELAYS = [1.0, 3.0, 5.0, 8.0, 12.0, 20.0, 30.0]
-LOAD_SIGMAS      = [0.05, 0.15, 0.25, 0.35, 0.50, 0.70]
+# 15 telemetry delays x 10 load sigmas = 150 situations (rows).
+# More resolution on DELAY because the best threshold changes faster
+# along that axis. Values are evenly spaced across the grounded ranges.
+TELEMETRY_DELAYS = [1.0, 3.0, 5.0, 7.0, 9.0, 11.0, 13.0, 15.0,
+                    17.0, 19.0, 22.0, 24.0, 26.0, 28.0, 30.0]
+LOAD_SIGMAS      = [0.05, 0.12, 0.19, 0.26, 0.33,
+                    0.40, 0.47, 0.55, 0.62, 0.70]
 
 DELAY_BUDGET_PCT = 2.0   # "near-optimal" = delay cost stays under this
 
@@ -126,7 +131,10 @@ def build(seeds, duration, model, workers=None):
 
 
 if __name__ == "__main__":
-    seeds = int(sys.argv[1]) if len(sys.argv) > 1 else 5
+    # Defaults tuned for the 150-point grid: fewer seeds/ticks per point,
+    # because the denser grid compensates. Override on the command line
+    # if you want higher precision per point: python build_table.py 5 800
+    seeds = int(sys.argv[1]) if len(sys.argv) > 1 else 3
     duration = int(sys.argv[2]) if len(sys.argv) > 2 else 600
     model = config.TRAFFIC_MODEL   # whatever config is set to
     build(seeds, duration, model)
